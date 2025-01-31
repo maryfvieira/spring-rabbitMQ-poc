@@ -72,6 +72,7 @@
     <modules>
         <module>rabbit-producer</module>
         <module>rabbit-consumer</module>
+<!--        <module>rabbit-common</module>-->
     </modules>
 
 </project>

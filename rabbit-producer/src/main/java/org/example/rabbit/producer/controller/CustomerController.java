@@ -1,7 +1,7 @@
 package org.example.rabbit.producer.controller;
 
 import lombok.extern.slf4j.Slf4j;
-import org.example.rabbit.producer.model.CustomerDto;
+import org.example.rabbit.common.model.Customer;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -25,7 +25,7 @@ public class CustomerController {
     }
 
     @PostMapping("json/{exchange}/{routingKey}")
-    public HttpEntity<?> postJsonExchange(@PathVariable String exchange, @PathVariable String routingKey, @RequestBody CustomerDto message){
+    public HttpEntity<?> postJsonExchange(@PathVariable String exchange, @PathVariable String routingKey, @RequestBody Customer message){
         rabbitTemplate.convertAndSend(exchange, routingKey, message);
         log.debug("post json message {} to exchange {} in routingKey {}", message, exchange, routingKey);
         return ResponseEntity.ok().build();
