@@ -1,0 +1,11 @@
+# PRODUCER SERVER PORT
+server:
+  port: 8083
+
+# MESSAGE BROKER CONFIG
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
