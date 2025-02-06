@@ -49,32 +49,4 @@ public class TopicConfig {
                 .with("FIRST-TOPIC.#")
                 .noargs();
     }
-
-    //    @Bean
-//    public Binding secondTopicBinding(){
-//
-//        return BindingBuilder
-//                .bind(firstQueue)
-//                .to(topicExchange())
-//                .with("SECOND-TOPIC.#")
-//                .noargs();
-//    }
-//    @Bean
-//    public Binding secondTopicBinding(){
-//
-//        return BindingBuilder
-//                .bind(topicQueue)
-//                .to(topicExchange())
-//                .with("SECOND-TOPIC.#")
-//                .noargs();
-//    }
-//    @Bean
-//    public Binding jsonTopicBinding(){
-//
-//        return BindingBuilder
-//                .bind(jsonQueue)
-//                .to(topicExchange())
-//                .with("routing.key.#")
-//                .noargs();
-//    }
 }

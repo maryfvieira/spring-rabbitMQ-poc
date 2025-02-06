@@ -1,4 +1,4 @@
-git<configuration>
+<configuration>
     <property name="LOG_DIR" value="logs-logback-with-spring-boot" />
     <property name="LOG_FILE" value="test-log" />
     <springProperty scope="context" name="APP_NAME" source="spring.application.name"/>
