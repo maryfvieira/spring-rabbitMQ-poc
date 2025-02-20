@@ -1,11 +1,19 @@
 package org.example;
 
 import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, World!");
-    }
+public class Main implements CommandLineRunner {
+	public static void main(String[] args) {
+		SpringApplication.run(Main.class, args);
+	}
+
+	@Override
+	public void run(String... args) throws Exception {
+		System.out.println("Spring Boot application has started!");
+		//... custom code ...
+	}
 }

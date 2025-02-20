@@ -13,6 +13,7 @@ import org.springframework.core.io.ClassPathResource;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.springframework.core.io.Resource;
 
 import java.io.IOException;
 
@@ -20,6 +21,9 @@ public class ProductCsvItemReader extends CsvItemReader<ProductDTO> {
 
 	public ProductCsvItemReader(String filePath) {
 		super(filePath);
+	}
+	public ProductCsvItemReader(Resource resource) {
+		super(resource);
 	}
 
 	@Override
