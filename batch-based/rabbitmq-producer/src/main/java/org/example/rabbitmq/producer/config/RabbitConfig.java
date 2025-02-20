@@ -19,7 +19,7 @@ import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionManager;
 
-@Configuration
+@Configuration("RabbitConfig")
 public class RabbitConfig {
 
 	@Autowired

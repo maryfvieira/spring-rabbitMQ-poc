@@ -17,6 +17,8 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.time.LocalDateTime;
 
+import static java.time.LocalDateTime.*;
+
 @Slf4j
 @EnableScheduling
 @Configuration
@@ -53,11 +55,11 @@ public class ScheduleConfig {
 		return threadPoolTaskExecutor;
 	}
 
-	@Scheduled(cron = "${schedule.cron.job}")
+	@Scheduled(cron = "0 */1 * * * *")
 	private void runJob() {
 		log.info("Starting JOB {}", job.getName());
 		poolTaskExecutor.execute(() -> {
-			JobParameters jobParameter = new JobParametersBuilder().addString("DateTime", LocalDateTime.now().toString()).toJobParameters();
+			JobParameters jobParameter = new JobParametersBuilder().addString("DateTime", now().toString()).toJobParameters();
 			try {
 				jobLauncher.run(job, jobParameter);
 			} catch (Exception e) {

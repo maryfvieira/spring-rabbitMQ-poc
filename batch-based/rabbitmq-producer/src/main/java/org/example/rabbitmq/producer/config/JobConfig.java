@@ -30,6 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.batch.BatchDataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
@@ -45,8 +46,8 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import javax.sql.DataSource;
 
-
 @Configuration
+@DependsOn({"DataSourceConfig", "RabbitConfig"})
 @EnableBatchProcessing(dataSourceRef = "dataSource", transactionManagerRef = "transactionManager")
 public class JobConfig {
 
@@ -54,11 +55,6 @@ public class JobConfig {
 
 	@Autowired
 	private DataSource dataSource;
-
-	@Bean
-	public MessageConverter jsonMessageConverter() {
-		return new Jackson2JsonMessageConverter();
-	}
 
 	@Value("data/products_catalog_mini.csv")
 	private Resource productsCsv;
@@ -92,10 +88,10 @@ public class JobConfig {
 		return new JpaTransactionManager();
 	}
 
-	@Bean
+	@Bean(name = "jobRepository")
 	public JobRepository jobRepository() throws Exception {
 		val jobrepositoryFactoryBean = new JobRepositoryFactoryBean();
-		jobrepositoryFactoryBean.setDataSource(dataSource);
+		jobrepositoryFactoryBean.setDataSource(this.dataSource);
 		jobrepositoryFactoryBean.setTransactionManager(transactionManager());
 		jobrepositoryFactoryBean.afterPropertiesSet();
 		return jobrepositoryFactoryBean.getObject();
