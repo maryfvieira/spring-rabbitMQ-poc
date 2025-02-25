@@ -26,11 +26,9 @@ import org.springframework.batch.item.ItemReader;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.amqp.AmqpItemWriter;
 import org.springframework.batch.support.transaction.ResourcelessTransactionManager;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.batch.BatchDataSource;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.DependsOn;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabase;
@@ -45,85 +43,135 @@ import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseBuilder;
 import org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseType;
 
 import javax.sql.DataSource;
+import java.io.IOException;
 
 @Configuration
-@DependsOn({"DataSourceConfig", "RabbitConfig"})
-@EnableBatchProcessing(dataSourceRef = "dataSource", transactionManagerRef = "transactionManager")
 public class JobConfig {
 
 	private static final String JOB_NAME = "productImportJob";
 
-	@Autowired
-	private DataSource dataSource;
-
-	@Value("data/products_catalog_mini.csv")
+	@Value("product_catalog_mini.csv")
 	private Resource productsCsv;
 
-	/*@Bean(name = "dataSource")
-	@BatchDataSource
-	public DataSource H2Datasource() {
-
-		EmbeddedDatabaseBuilder builder = new EmbeddedDatabaseBuilder();
-		EmbeddedDatabase embeddedDatabase = builder
-			.addScript("classpath:org/springframework/batch/core/schema-drop h2.sql")
-   			.addScript("classpath:org/springframework/batch/core/schema-h2.sql")
-   			.setType(EmbeddedDatabaseType.H2)
-			.build();
-		return embeddedDatabase;
-
-	}*/
-
-/*
 	@Bean
-	public Step masterStep(JobBuilderFactory jobBuilderFactory, StepBuilderFactory stepBuilderFactory) {
-		return stepBuilderFactory.get("masterStep")
-			.partitioner(slaveStep().getName(), partitioner()) // Define o particionamento
-			.step(slaveStep())
-			.gridSize(4) // Número de partições paralelas
-			.build();
-	}
-*/
-	@Bean(name = "transactionManager")
-	public PlatformTransactionManager transactionManager() {
-		return new JpaTransactionManager();
-	}
-
-	@Bean(name = "jobRepository")
-	public JobRepository jobRepository() throws Exception {
-		val jobrepositoryFactoryBean = new JobRepositoryFactoryBean();
-		jobrepositoryFactoryBean.setDataSource(this.dataSource);
-		jobrepositoryFactoryBean.setTransactionManager(transactionManager());
-		jobrepositoryFactoryBean.afterPropertiesSet();
-		return jobrepositoryFactoryBean.getObject();
+	public MessageConverter jsonMessageConverter() {
+		return new Jackson2JsonMessageConverter();
 	}
 
 	@Bean
-	public Step masterStep(JobRepository jobRepository,
-						   PlatformTransactionManager transactionManager) {
-		return new StepBuilder("masterSTep", jobRepository).
-			partitioner(slaveStep(jobRepository, transactionManager).getName(), productDataPartitioner())
-//			.step(slaveStep(jobRepository, transactionManager, amqpItemWriter))
-//			.gridSize(4)
-			.partitionHandler(partitionHandler(jobRepository, transactionManager))
-			.build();
+	public ItemReader<ProductDTO> productItemReader() throws IOException {
+
+		var productCsvItemReader =  new ProductCsvItemReader("product_catalog_mini.csv");
+		return productCsvItemReader.getReader();
 	}
 
+	/**
+	 * Process the product data
+	 *
+	 * @return ItemProcessor<ProductDTO, Product>
+	 */
 	@Bean
 	public ItemProcessor<ProductDTO, Product> productItemProcessor() {
 		return new ProductItemProcessor();
 	}
 
-	@Bean
-    public ItemReader<ProductDTO> productItemReader() {
-//		return new ProductCsvItemReader("data/products_catalog_mini.csv");
-		return new ProductCsvItemReader(productsCsv);
-    }
-
+	/**
+	 * Partition the product data
+	 *
+	 * @return ProductDataPartitioner
+	 */
 	@Bean
 	public ProductDataPartitioner productDataPartitioner() {
 		return new ProductDataPartitioner();
 	}
 
+	/**
+	 * Handle the partitioned data
+	 *
+	 * @param jobRepository JobRepository
+	 * @return PartitionHandler
+	 */
+	@Bean
+	public PartitionHandler partitionHandler(JobRepository jobRepository,  ItemReader<ProductDTO> productReader) {
+		TaskExecutorPartitionHandler taskExecutorPartitionHandler = new TaskExecutorPartitionHandler();
+		taskExecutorPartitionHandler.setGridSize(3);
+		taskExecutorPartitionHandler.setTaskExecutor(taskExecutor());
+		taskExecutorPartitionHandler.setStep(slaveStep(jobRepository, productReader));
+		return taskExecutorPartitionHandler;
+	}
+
+	/**
+	 * Create the slave step to process the product data
+	 *
+	 * @param jobRepository JobRepository
+	 * @return Step
+	 */
+	@Bean
+	public Step slaveStep(JobRepository jobRepository, ItemReader<ProductDTO> productReader) {
+		return new StepBuilder("slaveStep", jobRepository)
+			.<ProductDTO, Product>chunk(5, transactionManager())
+			.reader(productReader)
+			.processor(productItemProcessor())
+			.writer(productItemWriter())
+			.faultTolerant()
+			.listener(stepSkipListener())
+			.skipPolicy(new ExceptionSkipPolicy())
+			.build();
+	}
+
+	/**
+	 * Create the master step to partition the product data
+	 *
+	 * @param jobRepository JobRepository
+	 * @return Step
+	 */
+	@Bean
+	public Step masterStep(JobRepository jobRepository, ItemReader<ProductDTO> productReader) {
+		return new StepBuilder("masterSTep", jobRepository)
+			.partitioner(slaveStep(jobRepository, productReader).getName(), productDataPartitioner())
+			.partitionHandler(partitionHandler(jobRepository, productReader))
+			.build();
+	}
+
+	/**
+	 * Write the product data to the database
+	 *
+	 * @return ProductItemWriter
+	 */
+//    @Bean
+//    public ProductItemWriter productItemWriter() {
+//        return new ProductItemWriter();
+//    }
+
+	@Bean
+	public ProductCsvItemWriter productItemWriter(){
+		var exchange = "DIRECT-EXCHANGE-BASIC";
+		var routingKey = "TO-FIRST-QUEUE";
+
+		return new ProductCsvItemWriter(exchange, routingKey);
+	}
+
+	/**
+	 * Create the job to import the product data
+	 *
+	 * @param jobRepository JobRepository
+	 * @param listener      ProductImportJobCompletionListener
+	 * @return Job
+	 */
+	@Bean("productImportJob")
+	public Job productImportJob(JobRepository jobRepository, ProductImportJobCompletionListener listener, ItemReader<ProductDTO> productReader) {
+		return new JobBuilder(JOB_NAME, jobRepository)
+			.listener(listener)
+			.start(masterStep(jobRepository, productReader))
+			.build();
+	}
+
+
+	/**
+	 * Create the task executor
+	 *
+	 * @return TaskExecutor
+	 */
 	@Bean
 	public TaskExecutor taskExecutor() {
 		ThreadPoolTaskExecutor taskExecutor = new ThreadPoolTaskExecutor();
@@ -133,52 +181,24 @@ public class JobConfig {
 		return taskExecutor;
 	}
 
+	/**
+	 * Create the transaction manager
+	 *
+	 * @return PlatformTransactionManager
+	 */
 	@Bean
-	public PartitionHandler partitionHandler(JobRepository jobRepository,
-											 PlatformTransactionManager transactionManager
-											 ) {
-		TaskExecutorPartitionHandler taskExecutorPartitionHandler = new TaskExecutorPartitionHandler();
-		taskExecutorPartitionHandler.setGridSize(3);
-		taskExecutorPartitionHandler.setTaskExecutor(taskExecutor());
-		taskExecutorPartitionHandler.setStep(slaveStep(jobRepository, transactionManager));
-		return taskExecutorPartitionHandler;
+	public PlatformTransactionManager transactionManager() {
+		return new JpaTransactionManager();
 	}
 
-	@Bean
-	public ItemWriter<Product> amqpWriter(){
-		var exchange = "DIRECT-EXCHANGE-BASIC";
-		var routingKey = "TO-SECOND-QUEUE";
-
-		return new ProductCsvItemWriter(exchange, routingKey);
-	}
-
+	/**
+	 * Create the step skip listener
+	 *
+	 * @return StepSkipListener
+	 */
 	@Bean
 	public StepSkipListener stepSkipListener() {
 		return new StepSkipListener();
 	}
 
-
-	@Bean
-	public Step slaveStep(JobRepository jobRepository,
-						  PlatformTransactionManager transactionManager) {
-		return new StepBuilder("slaveStep", jobRepository)
-			.<ProductDTO, Product>chunk(10, transactionManager)
-			.reader(productItemReader())
-			.processor(productItemProcessor())
-			.writer(amqpWriter())
-			.faultTolerant()
-			.listener(stepSkipListener())
-			.skipPolicy(new ExceptionSkipPolicy())
-			.build();
-	}
-
-	@Bean("productImportJob")
-	public Job productImportJob(JobRepository jobRepository,
-								PlatformTransactionManager transactionManager,
-								ProductImportJobCompletionListener listener) {
-		return new JobBuilder(JOB_NAME, jobRepository)
-			.listener(listener)
-			.start(masterStep(jobRepository, transactionManager))
-			.build();
-	}
 }

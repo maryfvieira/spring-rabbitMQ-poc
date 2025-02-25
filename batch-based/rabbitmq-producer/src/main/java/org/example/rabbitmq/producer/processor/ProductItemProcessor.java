@@ -18,7 +18,11 @@ public class ProductItemProcessor implements ItemProcessor<ProductDTO, Product> 
 	private static final String ADMIN_USER = "admin";
 
 	/**
-	 business rules here
+	 * Process the provided ProductDTO and convert it to Product
+	 *
+	 * @param productDTO ProductDTO
+	 * @return Product
+	 * @throws Exception
 	 */
 	@Override
 	public Product process(ProductDTO productDTO) throws Exception {
@@ -28,9 +32,19 @@ public class ProductItemProcessor implements ItemProcessor<ProductDTO, Product> 
 				throw new BrandNotFoundException("Brand not found for product: " + productDTO.productName());
 			}
 
-			return new Product(productDTO.productId(), productDTO.productName(), productDTO.productBrand(),
-				productDTO.price(), productDTO.description(),
-				ADMIN_USER, java.time.LocalDateTime.now(), ACTIVE_STATUS);
+			var product = Product.builder()
+				.productId(productDTO.productId())
+				.brandName(productDTO.productBrand())
+				.name(productDTO.productName())
+				.createdBy(ADMIN_USER)
+				.createdDate( java.time.LocalDateTime.now())
+				.description(productDTO.description())
+				.updatedBy(ADMIN_USER)
+				.status("OK")
+				.price(productDTO.price()).build();
+
+
+			return product;
 		} else {
 			log.error("Error: While processing data: ProductDTO is null");
 			return null;

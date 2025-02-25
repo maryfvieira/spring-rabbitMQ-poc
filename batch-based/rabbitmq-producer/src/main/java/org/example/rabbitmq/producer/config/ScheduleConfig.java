@@ -14,15 +14,15 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 import static java.time.LocalDateTime.*;
 
 @Slf4j
-@EnableScheduling
-@Configuration
-//@ConditionalOnProperty(name = "schedule.enabled", matchIfMissing = false)
+@Component
+@ConditionalOnProperty(name = "schedule.enabled", matchIfMissing = false)
 public class ScheduleConfig {
 
 	@Autowired
@@ -41,12 +41,12 @@ public class ScheduleConfig {
 	public JobLauncher jobLoader(ThreadPoolTaskExecutor poolTaskExecutor) {
 		TaskExecutorJobLauncher jobLauncher = new TaskExecutorJobLauncher();
 		jobLauncher.setTaskExecutor(poolTaskExecutor);
-//		jobLauncher.setJobRepository(jobRepository);
+		jobLauncher.setJobRepository(jobRepository);
 		return jobLauncher;
 	}
 
 	@Bean
-	public ThreadPoolTaskExecutor poolTaskExecutor() {
+	private ThreadPoolTaskExecutor poolTaskExecutor() {
 		ThreadPoolTaskExecutor threadPoolTaskExecutor = new ThreadPoolTaskExecutor();
 		threadPoolTaskExecutor.setCorePoolSize(5);
 		threadPoolTaskExecutor.setMaxPoolSize(5);
@@ -55,9 +55,10 @@ public class ScheduleConfig {
 		return threadPoolTaskExecutor;
 	}
 
-	@Scheduled(cron = "0 */1 * * * *")
-	private void runJob() {
-		log.info("Starting JOB {}", job.getName());
+	//	@Scheduled(cron = "${schedule.cron.job}")
+	@Scheduled(fixedRate = 60000)
+	private void runJobWithSchedule() {
+		log.info("Starting JOB {} at {}", job.getName(), now().toString());
 		poolTaskExecutor.execute(() -> {
 			JobParameters jobParameter = new JobParametersBuilder().addString("DateTime", now().toString()).toJobParameters();
 			try {
